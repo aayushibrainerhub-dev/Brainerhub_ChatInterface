@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brainerhub Chat CRM</title>
+    <!-- Fonts -->
+    <link rel="stylesheet" href="/css/styles.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vue 3 and Chart.js CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- PAGE LOADING -->
+        <div v-if="pageLoading" class="modal-overlay" style="z-index: 1000;">
+            <div class="typing-indicator" style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
+                <div class="typing-dot" style="background-color: var(--accent-indigo);"></div>
+                <div class="typing-dot" style="background-color: var(--accent-indigo);"></div>
+                <div class="typing-dot" style="background-color: var(--accent-indigo);"></div>
+            </div>
+        </div>
+
+        <!-- 1. LOGIN VIEW -->
+        <div v-if="currentView === 'login'" class="login-view">
+            <div class="login-card glass-panel">
+                <div class="login-logo">
+                    <div class="logo-container">
+                        <i class="fa-solid fa-comments-dollar"></i>
+                    </div>
+                    <h1>Chat CRM</h1>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Sign in to access your tenant dashboard</p>
+                </div>
+                
+                <form @submit.prevent="handleLogin" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" class="form-control" v-model="loginForm.email" placeholder="admin@acme.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" class="form-control" v-model="loginForm.password" placeholder="••••••••" required>
+                    </div>
+                    
+                    <div v-if="loginError" style="color: var(--color-danger); font-size: 0.85rem; font-weight: 500; text-align: center;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> {{ loginError }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="justify-content: center; width: 100%; margin-top: 8px;">
+                        Sign In <i class="fa-solid fa-right-to-bracket"></i>
+                    </button>
+                </form>
+
+                <p style="text-align: center; margin-top: 4px; font-size: 0.85rem; color: var(--text-secondary);">
+                    Don't have an account? 
+                    <a href="#" @click.prevent="switchView('register')" style="color: var(--accent-indigo); font-weight: 600; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-violet)'" onmouseout="this.style.color='var(--accent-indigo)'">Sign Up</a>
+                </p>
+
+                <div class="demo-credentials">
+                    <p><strong>Demo Credentials:</strong></p>
+                    <p>Acme Corp Admin: <code>admin@acme.com</code> / <code>admin123</code></p>
+                    <p>Acme Corp User: <code>user@acme.com</code> / <code>user123</code></p>
+                    <p>Globex Corp User: <code>user@globex.com</code> / <code>user123</code></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1.5. REGISTER VIEW -->
+        <div v-if="currentView === 'register'" class="login-view">
+            <div class="login-card glass-panel" style="max-width: 460px;">
+                <div class="login-logo">
+                    <div class="logo-container">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </div>
+                    <h1>Create Account</h1>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Choose your access type to get started</p>
+                </div>
+
+                <div class="signup-type-selector" style="display: flex; gap: 12px; margin-bottom: 8px;">
+                    <button type="button" class="btn" :class="registerForm.signup_type === 'create_tenant' ? 'btn-primary' : 'btn-secondary'" @click="registerForm.signup_type = 'create_tenant'" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px 4px;">
+                        <i class="fa-solid fa-building-shield"></i> Create Workspace
+                    </button>
+                    <button type="button" class="btn" :class="registerForm.signup_type === 'join_tenant' ? 'btn-primary' : 'btn-secondary'" @click="registerForm.signup_type = 'join_tenant'" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px 4px;">
+                        <i class="fa-solid fa-building-user"></i> Join Workspace
+                    </button>
+                </div>
+                
+                <form @submit.prevent="handleRegister" style="display: flex; flex-direction: column; gap: 14px;">
+                    <!-- Workspace/Tenant Name (For Creating) -->
+                    <div class="form-group" v-if="registerForm.signup_type === 'create_tenant'">
+                        <label for="tenant_name">Workspace / Company Name *</label>
+                        <input type="text" id="tenant_name" class="form-control" v-model="registerForm.tenant_name" placeholder="e.g. Acme Corp" required>
+                    </div>
+
+                    <!-- Select Workspace (For Joining) -->
+                    <div class="form-group" v-if="registerForm.signup_type === 'join_tenant'">
+                        <label for="tenant_id">Select Workspace *</label>
+                        <select id="tenant_id" class="form-control" v-model="registerForm.tenant_id" style="background-color: #0b0f19;" required>
+                            <option value="" disabled selected>-- Select a Workspace --</option>
+                            <option v-for="t in allTenants" :key="t.id" :value="t.id">{{ t.name }}</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reg_name">Full Name *</label>
+                        <input type="text" id="reg_name" class="form-control" v-model="registerForm.name" placeholder="John Doe" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reg_email">Email Address *</label>
+                        <input type="email" id="reg_email" class="form-control" v-model="registerForm.email" placeholder="john@example.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reg_password">Password *</label>
+                        <input type="password" id="reg_password" class="form-control" v-model="registerForm.password" placeholder="Min 6 characters" minlength="6" required>
+                    </div>
+                    
+                    <div v-if="registerError" style="color: var(--color-danger); font-size: 0.85rem; font-weight: 500; text-align: center;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> {{ registerError }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="justify-content: center; width: 100%; margin-top: 8px;">
+                        Register & Get Started <i class="fa-solid fa-user-check"></i>
+                    </button>
+                </form>
+
+                <p style="text-align: center; margin-top: 4px; font-size: 0.85rem; color: var(--text-secondary);">
+                    Already have an account? 
+                    <a href="#" @click.prevent="switchView('login')" style="color: var(--accent-indigo); font-weight: 600; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-violet)'" onmouseout="this.style.color='var(--accent-indigo)'">Sign In</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- 2. MAIN APP VIEW -->
+        <div v-else class="app-container">
+            <!-- SIDEBAR -->
+            <aside class="sidebar glass-panel">
+                <div class="brand">
+                    <div class="brand-logo">
+                        <i class="fa-solid fa-comments-dollar"></i>
+                    </div>
+                    <span class="brand-name">Chat CRM</span>
+                </div>
+                
+                <span class="tenant-tag" v-if="tenant">
+                    <i class="fa-solid fa-building"></i> {{ tenant.name }}
+                </span>
+
+                <ul class="nav-menu">
+                    <!-- ADMIN-ONLY VIEWS -->
+                    <template v-if="user && user.role === 'admin'">
+                        <li class="nav-item" :class="{ active: currentView === 'dashboard' }">
+                            <a href="#" @click.prevent="switchView('dashboard')">
+                                <i class="fa-solid fa-chart-pie"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item" :class="{ active: currentView === 'clients' }">
+                            <a href="#" @click.prevent="switchView('clients')">
+                                <i class="fa-solid fa-users"></i> Clients
+                            </a>
+                        </li>
+                        <li class="nav-item" :class="{ active: currentView === 'leads' }">
+                            <a href="#" @click.prevent="switchView('leads')">
+                                <i class="fa-solid fa-bullseye"></i> Leads
+                            </a>
+                        </li>
+                        <li class="nav-item" :class="{ active: currentView === 'opportunities' }">
+                            <a href="#" @click.prevent="switchView('opportunities')">
+                                <i class="fa-solid fa-briefcase"></i> Opportunities
+                            </a>
+                        </li>
+                    </template>
+
+                    <!-- REGULAR USER VIEWS -->
+                    <template v-if="user && user.role === 'user'">
+                        <li class="nav-item" :class="{ active: currentView === 'chat' }">
+                            <a href="#" @click.prevent="switchView('chat')">
+                                <i class="fa-solid fa-comment-dots"></i> Chat with Data
+                            </a>
+                        </li>
+                    </template>
+
+                    <!-- ALL USER VIEWS -->
+                    <li class="nav-item" :class="{ active: currentView === 'settings' }">
+                        <a href="#" @click.prevent="switchView('settings')">
+                            <i class="fa-solid fa-gear"></i> Settings
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- USER PROFILE SECTION -->
+                <div class="user-profile-section" v-if="user">
+                    <div class="user-avatar">
+                        {{ user.name.split(' ').map(n => n[0]).join('') }}
+                    </div>
+                    <div class="user-info-text">
+                        <div class="profile-name">{{ user.name }}</div>
+                        <div class="profile-role">{{ user.role }}</div>
+                    </div>
+                    <button class="logout-btn" @click="logout" title="Log Out">
+                        <i class="fa-solid fa-power-off"></i>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- MAIN VIEW CONTAINER -->
+            <main class="main-content">
+                <!-- ================== 1. DASHBOARD VIEW ================== -->
+                <section v-if="currentView === 'dashboard'">
+                    <div class="view-header">
+                        <div class="view-title">
+                            <h1>Analytics Dashboard</h1>
+                            <p>Real-time pipeline metrics and customer summary</p>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card glass-panel">
+                            <div class="stat-info">
+                                <p>Total Clients</p>
+                                <h2>{{ stats.total_clients }}</h2>
+                            </div>
+                            <div class="stat-icon indigo">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-info">
+                                <p>Leads Count</p>
+                                <h2>{{ stats.total_leads }}</h2>
+                            </div>
+                            <div class="stat-icon violet">
+                                <i class="fa-solid fa-bullseye"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-info">
+                                <p>Leads Value</p>
+                                <h2>{{ formatCurrency(stats.total_lead_value) }}</h2>
+                            </div>
+                            <div class="stat-icon emerald">
+                                <i class="fa-solid fa-dollar-sign"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-info">
+                                <p>Sales Pipeline</p>
+                                <h2>{{ formatCurrency(stats.pipeline_value) }}</h2>
+                            </div>
+                            <div class="stat-icon emerald">
+                                <i class="fa-solid fa-briefcase"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-charts">
+                        <div class="chart-card glass-panel">
+                            <h3>Lead Status Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="leadStatusChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card glass-panel">
+                            <h3>Pipeline Value by Stage</h3>
+                            <div class="chart-container">
+                                <canvas id="oppStageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-activity-grid">
+                        <div class="recent-card glass-panel">
+                            <h3 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 16px;">Recent Leads</h3>
+                            <div class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Status</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="l in stats.recent_leads" :key="l.id">
+                                            <td>{{ l.title }}</td>
+                                            <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status }}</span></td>
+                                            <td>{{ formatCurrency(l.value) }}</td>
+                                        </tr>
+                                        <tr v-if="!stats.recent_leads || stats.recent_leads.length === 0">
+                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No recent leads</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="recent-card glass-panel">
+                            <h3 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 16px;">Active Opportunities</h3>
+                            <div class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Stage</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="o in stats.recent_opportunities" :key="o.id">
+                                            <td>{{ o.title }}</td>
+                                            <td><span class="tag" :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage }}</span></td>
+                                            <td>{{ formatCurrency(o.value) }}</td>
+                                        </tr>
+                                        <tr v-if="!stats.recent_opportunities || stats.recent_opportunities.length === 0">
+                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No active opportunities</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================== 2. CLIENTS VIEW ================== -->
+                <section v-if="currentView === 'clients'">
+                    <div class="view-header">
+                        <div class="view-title">
+                            <h1>Clients Database</h1>
+                            <p>Manage companies and contacts for your organization</p>
+                        </div>
+                        <button class="btn btn-primary" @click="openAddClient">
+                            <i class="fa-solid fa-user-plus"></i> Add Client
+                        </button>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 24px;">
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Company</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="c in clients" :key="c.id">
+                                        <td style="font-weight: 600; color: white;">{{ c.name }}</td>
+                                        <td>{{ c.company || 'N/A' }}</td>
+                                        <td>{{ c.email || 'N/A' }}</td>
+                                        <td>{{ c.phone || 'N/A' }}</td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="action-btn" @click="openEditClient(c)" title="Edit Client">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </button>
+                                                <button class="action-btn delete-btn" @click="deleteClient(c.id)" title="Delete Client">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="clients.length === 0">
+                                        <td colspan="5" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+                                            No clients registered. Click 'Add Client' to create your first contact.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================== 3. LEADS VIEW ================== -->
+                <section v-if="currentView === 'leads'">
+                    <div class="view-header">
+                        <div class="view-title">
+                            <h1>Leads Management</h1>
+                            <p>Track potential sales contacts and prospective pipeline additions</p>
+                        </div>
+                        <button class="btn btn-primary" @click="openAddLead">
+                            <i class="fa-solid fa-square-plus"></i> Create Lead
+                        </button>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 24px;">
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Company / Client</th>
+                                        <th>Status</th>
+                                        <th>Value</th>
+                                        <th>Date Added</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="l in leads" :key="l.id">
+                                        <td style="font-weight: 600; color: white;">{{ l.title }}</td>
+                                        <td>
+                                            <span v-if="l.client"><i class="fa-solid fa-user-tie"></i> {{ l.client.name }} ({{ l.client.company }})</span>
+                                            <span v-else><i class="fa-regular fa-user"></i> {{ l.name_fallback }}</span>
+                                        </td>
+                                        <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status }}</span></td>
+                                        <td style="font-weight: 600; color: #10b981;">{{ formatCurrency(l.value) }}</td>
+                                        <td>{{ formatDate(l.created_at) }}</td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="action-btn" @click="openEditLead(l)" title="Edit Lead">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </button>
+                                                <button class="action-btn delete-btn" @click="deleteLead(l.id)" title="Delete Lead">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="leads.length === 0">
+                                        <td colspan="6" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+                                            No sales leads logged. Click 'Create Lead' to register a new prospect.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================== 4. OPPORTUNITIES VIEW ================== -->
+                <section v-if="currentView === 'opportunities'">
+                    <div class="view-header">
+                        <div class="view-title">
+                            <h1>Opportunities (Deals)</h1>
+                            <p>Track active transactions, deal probability, and expected closed valuations</p>
+                        </div>
+                        <button class="btn btn-primary" @click="openAddOpp">
+                            <i class="fa-solid fa-folder-plus"></i> Add Opportunity
+                        </button>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 24px;">
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Origin Lead</th>
+                                        <th>Stage</th>
+                                        <th>Probability</th>
+                                        <th>Value</th>
+                                        <th>Est. Close Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="o in opportunities" :key="o.id">
+                                        <td style="font-weight: 600; color: white;">{{ o.title }}</td>
+                                        <td>{{ o.lead ? o.lead.title : 'Direct' }}</td>
+                                        <td><span class="tag" :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage }}</span></td>
+                                        <td>
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <div style="flex-grow: 1; height: 6px; width: 60px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                                    <div :style="'height: 100%; background: var(--accent-indigo); width: ' + o.probability + '%'"></div>
+                                                </div>
+                                                <span>{{ o.probability }}%</span>
+                                            </div>
+                                        </td>
+                                        <td style="font-weight: 600; color: #10b981;">{{ formatCurrency(o.value) }}</td>
+                                        <td>{{ formatDate(o.close_date) }}</td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="action-btn" @click="openEditOpp(o)" title="Edit Opportunity">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </button>
+                                                <button class="action-btn delete-btn" @click="deleteOpp(o.id)" title="Delete Opportunity">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="opportunities.length === 0">
+                                        <td colspan="7" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+                                            No opportunities found. Click 'Add Opportunity' to launch a transaction pipeline.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================== 5. CHAT WITH DATA VIEW ================== -->
+                <section v-if="currentView === 'chat'">
+                    <div class="view-header">
+                        <div class="view-title">
+                            <h1>Chat CRM AI</h1>
+                            <p>Ask questions in natural language to query, filter, and summarize CRM metrics</p>
+                        </div>
+                    </div>
+
+                    <!-- ADMIN RESTRICTED VIEW -->
+                    <div v-if="user && user.role === 'admin'" class="glass-panel restricted-overlay">
+                        <i class="fa-solid fa-circle-nodes"></i>
+                        <h2>Chat is Reserved for Representatives</h2>
+                        <p>Administrator profiles oversee analytics directly from tabular interfaces and charts. Please login using a regular 'user' account (e.g. <code>user@acme.com</code>) to interact with data via chat.</p>
+                    </div>
+
+                    <div v-else class="chat-layout">
+                        <!-- CHAT PANEL -->
+                        <div class="chat-history-container glass-panel" id="chatHistoryContainer">
+                            <!-- INTRO BOX -->
+                            <div class="chat-bubble chat-bubble-assistant">
+                                <div class="chat-avatar chat-avatar-assistant">
+                                    <i class="fa-solid fa-robot"></i>
+                                </div>
+                                <div class="chat-text">
+                                    <p>Hello! I am your CRM Data Assistant. I can query your clients, leads, and sales pipeline for you. Ask me questions like:</p>
+                                    <ul>
+                                        <li>"How many leads are available?"</li>
+                                        <li>"What is the total value of our opportunities?"</li>
+                                        <li>"Show me our clients"</li>
+                                        <li>"List opportunities in Negotiation stage"</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- CHAT LOGS -->
+                            <div v-for="msg in chatMessages" :key="msg.id" class="chat-bubble" :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'">
+                                <div class="chat-avatar" :class="msg.role === 'user' ? 'chat-avatar-user' : 'chat-avatar-assistant'">
+                                    <i class="fa-solid" :class="msg.role === 'user' ? 'fa-user' : 'fa-robot'"></i>
+                                </div>
+                                <div class="chat-text">
+                                    {{ msg.content }}
+                                    
+                                    <!-- Executed SQL query disclosure -->
+                                    <template v-if="msg.sql_executed">
+                                        <button class="chat-sql-toggle" @click="toggleSql(msg)">
+                                            <i class="fa-solid fa-code"></i> {{ msg.showSql ? 'Hide SQL Query' : 'Inspect Executed SQL' }}
+                                        </button>
+                                        <pre v-if="msg.showSql" class="chat-sql-content">{{ msg.sql_executed }}</pre>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- BOT TYPING INDICATOR -->
+                            <div v-if="chatLoading" class="chat-bubble chat-bubble-assistant">
+                                <div class="chat-avatar chat-avatar-assistant">
+                                    <i class="fa-solid fa-robot"></i>
+                                </div>
+                                <div class="typing-indicator">
+                                    <div class="typing-dot"></div>
+                                    <div class="typing-dot"></div>
+                                    <div class="typing-dot"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CHAT BOX INPUT -->
+                        <form @submit.prevent="sendChatMessage" class="chat-input-area">
+                            <div class="chat-input-container">
+                                <input type="text" v-model="chatInput" placeholder="Ask about leads, clients, or pipeline..." :disabled="chatLoading">
+                                <button type="submit" class="send-msg-btn" :disabled="chatLoading">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- ================== 6. SETTINGS VIEW ================== -->
+                <section v-if="currentView === 'settings'">
+                    <div class="view-header">
+                        <div class="view-title">
+                            <h1>System Settings</h1>
+                            <p>Tenant credentials, workspace profile details, and user accounts</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-layout">
+                        <!-- Navigation Menu -->
+                        <div class="settings-menu glass-panel" style="padding: 16px;">
+                            <div class="settings-tab" :class="{ active: settingsTab === 'profile' }" @click="settingsTab = 'profile'">
+                                <i class="fa-solid fa-id-card" style="margin-right: 8px;"></i> Profile & Tenant
+                            </div>
+                            <div class="settings-tab" v-if="user && user.role === 'admin'" :class="{ active: settingsTab === 'users' }" @click="settingsTab = 'users'">
+                                <i class="fa-solid fa-users-gear" style="margin-right: 8px;"></i> User Management
+                            </div>
+                        </div>
+
+                        <!-- Panel Content -->
+                        <div class="settings-panel glass-panel">
+                            <!-- A. Profile Tab -->
+                            <div v-if="settingsTab === 'profile'">
+                                <h3>Workspace Profile</h3>
+                                <div class="tenant-details-card">
+                                    <table>
+                                        <tbody>
+                                            <tr v-if="tenant">
+                                                <td>Tenant Name</td>
+                                                <td><strong style="color: white;">{{ tenant.name }}</strong></td>
+                                            </tr>
+                                            <tr v-if="tenant">
+                                                <td>Tenant ID</td>
+                                                <td><code>{{ tenant.id }}</code></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Profile Role</td>
+                                                <td><span class="tag tag-qualified" style="text-transform: uppercase;">{{ user.role }}</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Status</td>
+                                                <td>Active <i class="fa-solid fa-circle" style="color: var(--color-success); font-size: 0.6rem; margin-left: 4px;"></i></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <h3>CRM Query Integration</h3>
+                                <div class="tenant-details-card">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <div>
+                                            <h4 style="color: white; margin-bottom: 4px;">Groq Cloud LLM Status</h4>
+                                            <p style="color: var(--text-secondary); font-size: 0.8rem;">
+                                                Model: <code>llama-3.3-70b-versatile</code> (via OpenAI client base_url)
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span v-if="groqConfigured" class="tag tag-won">
+                                                <i class="fa-solid fa-link"></i> Connected (Groq API Key set)
+                                            </span>
+                                            <span v-else class="tag tag-contacted">
+                                                <i class="fa-solid fa-triangle-exclamation"></i> Standby (Local Fallback Parser active)
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 12px;">
+                                        * To activate advanced Groq LLM reasoning and query conversion, configure <code>GROQ_API_KEY</code> in the server <code>.env</code> file.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- B. Users Tab -->
+                            <div v-if="settingsTab === 'users' && user && user.role === 'admin'">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                    <h3>Tenant User Accounts</h3>
+                                    <button class="btn btn-primary btn-sm" @click="openAddUser" style="padding: 6px 12px; font-size: 0.8rem;">
+                                        <i class="fa-solid fa-user-plus"></i> Add Account
+                                    </button>
+                                </div>
+
+                                <div class="data-table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th>Joined</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="tu in tenantUsers" :key="tu.id">
+                                                <td style="color: white; font-weight: 500;">{{ tu.name }}</td>
+                                                <td>{{ tu.email }}</td>
+                                                <td><span class="tag" :class="tu.role === 'admin' ? 'tag-qualified' : 'tag-new'">{{ tu.role }}</span></td>
+                                                <td>{{ formatDate(tu.created_at) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- ================== MODALS ================== -->
+        
+        <!-- 1. CLIENT MODAL -->
+        <div v-if="showClientModal" class="modal-overlay">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h2>{{ clientForm.id ? 'Edit Client Profile' : 'Add New Client' }}</h2>
+                    <button class="close-modal-btn" @click="showClientModal = false">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="saveClient" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-group">
+                        <label>Client Name *</label>
+                        <input type="text" class="form-control" v-model="clientForm.name" required placeholder="e.g. John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Company / Organization</label>
+                        <input type="text" class="form-control" v-model="clientForm.company" placeholder="e.g. Apex Corp">
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" class="form-control" v-model="clientForm.email" placeholder="e.g. john@doe.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="text" class="form-control" v-model="clientForm.phone" placeholder="e.g. 555-0199">
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+                        <button type="button" class="btn btn-secondary" @click="showClientModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Profile</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2. LEAD MODAL -->
+        <div v-if="showLeadModal" class="modal-overlay">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h2>{{ leadForm.id ? 'Edit Sales Lead' : 'Register Sales Lead' }}</h2>
+                    <button class="close-modal-btn" @click="showLeadModal = false">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="saveLead" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-group">
+                        <label>Lead Title *</label>
+                        <input type="text" class="form-control" v-model="leadForm.title" required placeholder="e.g. Cloud Consultation Contract">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Link Existing Client</label>
+                        <select class="form-control" v-model="leadForm.client_id" style="background-color: #0b0f19;">
+                            <option value="">-- No Link (Use Custom Lead Contact Info) --</option>
+                            <option v-for="c in clients" :key="c.id" :value="c.id">
+                                {{ c.name }} ({{ c.company }})
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Fallback contact info if no client is selected -->
+                    <template v-if="!leadForm.client_id">
+                        <div class="form-group">
+                            <label>Contact Person Name *</label>
+                            <input type="text" class="form-control" v-model="leadForm.name_fallback" placeholder="e.g. Tony Stark">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Email Address</label>
+                            <input type="email" class="form-control" v-model="leadForm.email_fallback" placeholder="e.g. tony@stark.com">
+                        </div>
+                    </template>
+
+                    <div class="form-group">
+                        <label>Estimated Value ($) *</label>
+                        <input type="number" step="0.01" class="form-control" v-model="leadForm.value" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Lead Status</label>
+                        <select class="form-control" v-model="leadForm.status" style="background-color: #0b0f19;">
+                            <option value="New">New</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Qualified">Qualified</option>
+                            <option value="Won">Won</option>
+                            <option value="Lost">Lost</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" v-model="leadForm.description" rows="3" placeholder="Brief notes about product interests..."></textarea>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+                        <button type="button" class="btn btn-secondary" @click="showLeadModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Lead</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 3. OPPORTUNITY MODAL -->
+        <div v-if="showOppModal" class="modal-overlay">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h2>{{ oppForm.id ? 'Edit Deal Opportunity' : 'Launch Sales Opportunity' }}</h2>
+                    <button class="close-modal-btn" @click="showOppModal = false">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="saveOpp" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-group">
+                        <label>Deal / Opportunity Title *</label>
+                        <input type="text" class="form-control" v-model="oppForm.title" required placeholder="e.g. Acme SaaS Subscription Plan">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Link Origin Lead</label>
+                        <select class="form-control" v-model="oppForm.lead_id" style="background-color: #0b0f19;">
+                            <option value="">-- Direct Deal (No Link) --</option>
+                            <option v-for="l in leads" :key="l.id" :value="l.id">
+                                {{ l.title }} (Valued: {{ formatCurrency(l.value) }})
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Deal Valuation ($) *</label>
+                        <input type="number" step="0.01" class="form-control" v-model="oppForm.value" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Closing Stage</label>
+                        <select class="form-control" v-model="oppForm.stage" style="background-color: #0b0f19;">
+                            <option value="Discovery">Discovery</option>
+                            <option value="Proposal">Proposal</option>
+                            <option value="Negotiation">Negotiation</option>
+                            <option value="Closed Won">Closed Won</option>
+                            <option value="Closed Lost">Closed Lost</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Win Probability (%) *</label>
+                        <input type="number" min="0" max="100" class="form-control" v-model="oppForm.probability" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Target Closing Date</label>
+                        <input type="date" class="form-control" v-model="oppForm.close_date">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" v-model="oppForm.description" rows="3" placeholder="Contract terms, SLA agreements..."></textarea>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+                        <button type="button" class="btn btn-secondary" @click="showOppModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Opportunity</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 4. USER MODAL -->
+        <div v-if="showUserModal" class="modal-overlay">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h2>Add Tenant User Account</h2>
+                    <button class="close-modal-btn" @click="showUserModal = false">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="saveUser" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" class="form-control" v-model="userForm.name" required placeholder="e.g. John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address *</label>
+                        <input type="email" class="form-control" v-model="userForm.email" required placeholder="e.g. john@acme.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Password *</label>
+                        <input type="password" class="form-control" v-model="userForm.password" required placeholder="Min 6 characters">
+                    </div>
+                    <div class="form-group">
+                        <label>User Role</label>
+                        <select class="form-control" v-model="userForm.role" style="background-color: #0b0f19;">
+                            <option value="user">User (Customer Representative, Chat-Enabled)</option>
+                            <option value="admin">Admin (Full Access, Dashboard, CRUD)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+                        <button type="button" class="btn btn-secondary" @click="showUserModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Load App JS -->
+    <script src="/js/app.js"></script>
+</body>
+</html>
