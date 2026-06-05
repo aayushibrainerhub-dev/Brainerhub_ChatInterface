@@ -1,29 +1,31 @@
-import os
-from dotenv import load_dotenv
-import jwt
-from datetime import datatime, timedelta, timezone
+# import os
 
-load_dotenv()
+# from datetime import datetime, timedelta, timezone
+# from typing import Any
 
-def generate_jwt(user):
-    secret = os.getenv("JWT_SECRET")
-    if not secret:
-        raise ValueError("JWT_SECRET not found in .env")
+# import jwt
+# from dotenv import load_dotenv
 
-    expiration_time = datetime.now(timezone.utc) + timedelta(minutes = 15)
-    payload = {
-        "user_id": user.id,
-        "email": user.email,
-        "tenant_id": user.tenant_id,
-        "role": user.role,
-        "exp" : expiration_time,
-    }
-
-    token = jwt.encode(payload, secret, algorithm="HS256")
-    return token
-
-if __name__ == "__main__":
-    print(generate_jwt())
+# load_dotenv()
+# JWT_SECRET = os.getenv("JWT_SECRET")
+# if not JWT_SECRET:
+#     raise ValueError("JWT_SECRET not found in .env")
 
 
-    # need to add validation here
+# def generate_jwt(user: Any) -> str:
+#     expiration_time = datetime.now(timezone.utc) + timedelta(minutes=15)
+#     payload = {
+#         "user_id": user.id,
+#         "email": user.email,
+#         "tenant_id": user.tenant_id,
+#         "role": user.role,
+#         "exp": expiration_time,
+#     }
+#     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+# def generate_token_for_user(user: Any) -> str:
+
+#     return generate_jwt(user)
+
+

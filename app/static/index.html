@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,11 +13,13 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div id="app">
         <!-- PAGE LOADING -->
         <div v-if="pageLoading" class="modal-overlay" style="z-index: 1000;">
-            <div class="typing-indicator" style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
+            <div class="typing-indicator"
+                style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
                 <div class="typing-dot" style="background-color: var(--accent-indigo);"></div>
                 <div class="typing-dot" style="background-color: var(--accent-indigo);"></div>
                 <div class="typing-dot" style="background-color: var(--accent-indigo);"></div>
@@ -31,31 +34,39 @@
                         <i class="fa-solid fa-comments-dollar"></i>
                     </div>
                     <h1>Chat CRM</h1>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Sign in to access your tenant dashboard</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Sign in to access your tenant dashboard
+                    </p>
                 </div>
-                
+
                 <form @submit.prevent="handleLogin" style="display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-group">
                         <label for="email">Email Address</label>
-                        <input type="email" id="email" class="form-control" v-model="loginForm.email" placeholder="admin@acme.com" required>
+                        <input type="email" id="email" class="form-control" v-model="loginForm.email"
+                            placeholder="admin@acme.com" required>
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" class="form-control" v-model="loginForm.password" placeholder="••••••••" required>
+                        <input type="password" id="password" class="form-control" v-model="loginForm.password"
+                            placeholder="••••••••" required>
                     </div>
-                    
-                    <div v-if="loginError" style="color: var(--color-danger); font-size: 0.85rem; font-weight: 500; text-align: center;">
+
+                    <div v-if="loginError"
+                        style="color: var(--color-danger); font-size: 0.85rem; font-weight: 500; text-align: center;">
                         <i class="fa-solid fa-triangle-exclamation"></i> {{ loginError }}
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="justify-content: center; width: 100%; margin-top: 8px;">
+                    <button type="submit" class="btn btn-primary"
+                        style="justify-content: center; width: 100%; margin-top: 8px;">
                         Sign In <i class="fa-solid fa-right-to-bracket"></i>
                     </button>
                 </form>
 
                 <p style="text-align: center; margin-top: 4px; font-size: 0.85rem; color: var(--text-secondary);">
-                    Don't have an account? 
-                    <a href="#" @click.prevent="switchView('register')" style="color: var(--accent-indigo); font-weight: 600; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-violet)'" onmouseout="this.style.color='var(--accent-indigo)'">Sign Up</a>
+                    Don't have an account?
+                    <a href="#" @click.prevent="switchView('register')"
+                        style="color: var(--accent-indigo); font-weight: 600; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='var(--accent-violet)'"
+                        onmouseout="this.style.color='var(--accent-indigo)'">Sign Up</a>
                 </p>
 
                 <div class="demo-credentials">
@@ -75,29 +86,38 @@
                         <i class="fa-solid fa-user-plus"></i>
                     </div>
                     <h1>Create Account</h1>
-                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Choose your access type to get started</p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Choose your access type to get started
+                    </p>
                 </div>
 
                 <div class="signup-type-selector" style="display: flex; gap: 12px; margin-bottom: 8px;">
-                    <button type="button" class="btn" :class="registerForm.signup_type === 'create_tenant' ? 'btn-primary' : 'btn-secondary'" @click="registerForm.signup_type = 'create_tenant'" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px 4px;">
+                    <button type="button" class="btn"
+                        :class="registerForm.signup_type === 'create_tenant' ? 'btn-primary' : 'btn-secondary'"
+                        @click="registerForm.signup_type = 'create_tenant'"
+                        style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px 4px;">
                         <i class="fa-solid fa-building-shield"></i> Create Workspace
                     </button>
-                    <button type="button" class="btn" :class="registerForm.signup_type === 'join_tenant' ? 'btn-primary' : 'btn-secondary'" @click="registerForm.signup_type = 'join_tenant'" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px 4px;">
+                    <button type="button" class="btn"
+                        :class="registerForm.signup_type === 'join_tenant' ? 'btn-primary' : 'btn-secondary'"
+                        @click="registerForm.signup_type = 'join_tenant'"
+                        style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px 4px;">
                         <i class="fa-solid fa-building-user"></i> Join Workspace
                     </button>
                 </div>
-                
+
                 <form @submit.prevent="handleRegister" style="display: flex; flex-direction: column; gap: 14px;">
                     <!-- Workspace/Tenant Name (For Creating) -->
                     <div class="form-group" v-if="registerForm.signup_type === 'create_tenant'">
                         <label for="tenant_name">Workspace / Company Name *</label>
-                        <input type="text" id="tenant_name" class="form-control" v-model="registerForm.tenant_name" placeholder="e.g. Acme Corp" required>
+                        <input type="text" id="tenant_name" class="form-control" v-model="registerForm.tenant_name"
+                            placeholder="e.g. Acme Corp" required>
                     </div>
 
                     <!-- Select Workspace (For Joining) -->
                     <div class="form-group" v-if="registerForm.signup_type === 'join_tenant'">
                         <label for="tenant_id">Select Workspace *</label>
-                        <select id="tenant_id" class="form-control" v-model="registerForm.tenant_id" style="background-color: #0b0f19;" required>
+                        <select id="tenant_id" class="form-control" v-model="registerForm.tenant_id"
+                            style="background-color: #0b0f19;" required>
                             <option value="" disabled selected>-- Select a Workspace --</option>
                             <option v-for="t in allTenants" :key="t.id" :value="t.id">{{ t.name }}</option>
                         </select>
@@ -105,31 +125,39 @@
 
                     <div class="form-group">
                         <label for="reg_name">Full Name *</label>
-                        <input type="text" id="reg_name" class="form-control" v-model="registerForm.name" placeholder="John Doe" required>
+                        <input type="text" id="reg_name" class="form-control" v-model="registerForm.name"
+                            placeholder="John Doe" required>
                     </div>
 
                     <div class="form-group">
                         <label for="reg_email">Email Address *</label>
-                        <input type="email" id="reg_email" class="form-control" v-model="registerForm.email" placeholder="john@example.com" required>
+                        <input type="email" id="reg_email" class="form-control" v-model="registerForm.email"
+                            placeholder="john@example.com" required>
                     </div>
 
                     <div class="form-group">
                         <label for="reg_password">Password *</label>
-                        <input type="password" id="reg_password" class="form-control" v-model="registerForm.password" placeholder="Min 6 characters" minlength="6" required>
+                        <input type="password" id="reg_password" class="form-control" v-model="registerForm.password"
+                            placeholder="Min 6 characters" minlength="6" required>
                     </div>
-                    
-                    <div v-if="registerError" style="color: var(--color-danger); font-size: 0.85rem; font-weight: 500; text-align: center;">
+
+                    <div v-if="registerError"
+                        style="color: var(--color-danger); font-size: 0.85rem; font-weight: 500; text-align: center;">
                         <i class="fa-solid fa-triangle-exclamation"></i> {{ registerError }}
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="justify-content: center; width: 100%; margin-top: 8px;">
+                    <button type="submit" class="btn btn-primary"
+                        style="justify-content: center; width: 100%; margin-top: 8px;">
                         Register & Get Started <i class="fa-solid fa-user-check"></i>
                     </button>
                 </form>
 
                 <p style="text-align: center; margin-top: 4px; font-size: 0.85rem; color: var(--text-secondary);">
-                    Already have an account? 
-                    <a href="#" @click.prevent="switchView('login')" style="color: var(--accent-indigo); font-weight: 600; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-violet)'" onmouseout="this.style.color='var(--accent-indigo)'">Sign In</a>
+                    Already have an account?
+                    <a href="#" @click.prevent="switchView('login')"
+                        style="color: var(--accent-indigo); font-weight: 600; text-decoration: none; transition: color 0.2s;"
+                        onmouseover="this.style.color='var(--accent-violet)'"
+                        onmouseout="this.style.color='var(--accent-indigo)'">Sign In</a>
                 </p>
             </div>
         </div>
@@ -144,7 +172,7 @@
                     </div>
                     <span class="brand-name">Chat CRM</span>
                 </div>
-                
+
                 <span class="tenant-tag" v-if="tenant">
                     <i class="fa-solid fa-building"></i> {{ tenant.name }}
                 </span>
@@ -286,11 +314,13 @@
                                     <tbody>
                                         <tr v-for="l in stats.recent_leads" :key="l.id">
                                             <td>{{ l.title }}</td>
-                                            <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status }}</span></td>
+                                            <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status
+                                                    }}</span></td>
                                             <td>{{ formatCurrency(l.value) }}</td>
                                         </tr>
                                         <tr v-if="!stats.recent_leads || stats.recent_leads.length === 0">
-                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No recent leads</td>
+                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No
+                                                recent leads</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -298,7 +328,8 @@
                         </div>
 
                         <div class="recent-card glass-panel">
-                            <h3 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 16px;">Active Opportunities</h3>
+                            <h3 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 16px;">Active
+                                Opportunities</h3>
                             <div class="data-table-container">
                                 <table class="data-table">
                                     <thead>
@@ -311,11 +342,15 @@
                                     <tbody>
                                         <tr v-for="o in stats.recent_opportunities" :key="o.id">
                                             <td>{{ o.title }}</td>
-                                            <td><span class="tag" :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage }}</span></td>
+                                            <td><span class="tag"
+                                                    :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage
+                                                    }}</span></td>
                                             <td>{{ formatCurrency(o.value) }}</td>
                                         </tr>
-                                        <tr v-if="!stats.recent_opportunities || stats.recent_opportunities.length === 0">
-                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No active opportunities</td>
+                                        <tr
+                                            v-if="!stats.recent_opportunities || stats.recent_opportunities.length === 0">
+                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No
+                                                active opportunities</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -356,17 +391,20 @@
                                         <td>{{ c.phone || 'N/A' }}</td>
                                         <td>
                                             <div class="action-buttons">
-                                                <button class="action-btn" @click="openEditClient(c)" title="Edit Client">
+                                                <button class="action-btn" @click="openEditClient(c)"
+                                                    title="Edit Client">
                                                     <i class="fa-solid fa-pen-to-square"></i>
                                                 </button>
-                                                <button class="action-btn delete-btn" @click="deleteClient(c.id)" title="Delete Client">
+                                                <button class="action-btn delete-btn" @click="deleteClient(c.id)"
+                                                    title="Delete Client">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
                                     <tr v-if="clients.length === 0">
-                                        <td colspan="5" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+                                        <td colspan="5"
+                                            style="text-align: center; padding: 40px 0; color: var(--text-muted);">
                                             No clients registered. Click 'Add Client' to create your first contact.
                                         </td>
                                     </tr>
@@ -405,10 +443,12 @@
                                     <tr v-for="l in leads" :key="l.id">
                                         <td style="font-weight: 600; color: white;">{{ l.title }}</td>
                                         <td>
-                                            <span v-if="l.client"><i class="fa-solid fa-user-tie"></i> {{ l.client.name }} ({{ l.client.company }})</span>
+                                            <span v-if="l.client"><i class="fa-solid fa-user-tie"></i> {{ l.client.name
+                                                }} ({{ l.client.company }})</span>
                                             <span v-else><i class="fa-regular fa-user"></i> {{ l.name_fallback }}</span>
                                         </td>
-                                        <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status }}</span></td>
+                                        <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status
+                                                }}</span></td>
                                         <td style="font-weight: 600; color: #10b981;">{{ formatCurrency(l.value) }}</td>
                                         <td>{{ formatDate(l.created_at) }}</td>
                                         <td>
@@ -416,14 +456,16 @@
                                                 <button class="action-btn" @click="openEditLead(l)" title="Edit Lead">
                                                     <i class="fa-solid fa-pen-to-square"></i>
                                                 </button>
-                                                <button class="action-btn delete-btn" @click="deleteLead(l.id)" title="Delete Lead">
+                                                <button class="action-btn delete-btn" @click="deleteLead(l.id)"
+                                                    title="Delete Lead">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
                                     <tr v-if="leads.length === 0">
-                                        <td colspan="6" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+                                        <td colspan="6"
+                                            style="text-align: center; padding: 40px 0; color: var(--text-muted);">
                                             No sales leads logged. Click 'Create Lead' to register a new prospect.
                                         </td>
                                     </tr>
@@ -463,11 +505,16 @@
                                     <tr v-for="o in opportunities" :key="o.id">
                                         <td style="font-weight: 600; color: white;">{{ o.title }}</td>
                                         <td>{{ o.lead ? o.lead.title : 'Direct' }}</td>
-                                        <td><span class="tag" :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage }}</span></td>
+                                        <td><span class="tag"
+                                                :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage
+                                                }}</span></td>
                                         <td>
                                             <div style="display: flex; align-items: center; gap: 8px;">
-                                                <div style="flex-grow: 1; height: 6px; width: 60px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
-                                                    <div :style="'height: 100%; background: var(--accent-indigo); width: ' + o.probability + '%'"></div>
+                                                <div
+                                                    style="flex-grow: 1; height: 6px; width: 60px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                                    <div
+                                                        :style="'height: 100%; background: var(--accent-indigo); width: ' + o.probability + '%'">
+                                                    </div>
                                                 </div>
                                                 <span>{{ o.probability }}%</span>
                                             </div>
@@ -476,18 +523,22 @@
                                         <td>{{ formatDate(o.close_date) }}</td>
                                         <td>
                                             <div class="action-buttons">
-                                                <button class="action-btn" @click="openEditOpp(o)" title="Edit Opportunity">
+                                                <button class="action-btn" @click="openEditOpp(o)"
+                                                    title="Edit Opportunity">
                                                     <i class="fa-solid fa-pen-to-square"></i>
                                                 </button>
-                                                <button class="action-btn delete-btn" @click="deleteOpp(o.id)" title="Delete Opportunity">
+                                                <button class="action-btn delete-btn" @click="deleteOpp(o.id)"
+                                                    title="Delete Opportunity">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
                                     <tr v-if="opportunities.length === 0">
-                                        <td colspan="7" style="text-align: center; padding: 40px 0; color: var(--text-muted);">
-                                            No opportunities found. Click 'Add Opportunity' to launch a transaction pipeline.
+                                        <td colspan="7"
+                                            style="text-align: center; padding: 40px 0; color: var(--text-muted);">
+                                            No opportunities found. Click 'Add Opportunity' to launch a transaction
+                                            pipeline.
                                         </td>
                                     </tr>
                                 </tbody>
@@ -509,7 +560,9 @@
                     <div v-if="user && user.role === 'admin'" class="glass-panel restricted-overlay">
                         <i class="fa-solid fa-circle-nodes"></i>
                         <h2>Chat is Reserved for Representatives</h2>
-                        <p>Administrator profiles oversee analytics directly from tabular interfaces and charts. Please login using a regular 'user' account (e.g. <code>user@acme.com</code>) to interact with data via chat.</p>
+                        <p>Administrator profiles oversee analytics directly from tabular interfaces and charts. Please
+                            login using a regular 'user' account (e.g. <code>user@acme.com</code>) to interact with data
+                            via chat.</p>
                     </div>
 
                     <div v-else class="chat-layout">
@@ -521,7 +574,8 @@
                                     <i class="fa-solid fa-robot"></i>
                                 </div>
                                 <div class="chat-text">
-                                    <p>Hello! I am your CRM Data Assistant. I can query your clients, leads, and sales pipeline for you. Ask me questions like:</p>
+                                    <p>Hello! I am your CRM Data Assistant. I can query your clients, leads, and sales
+                                        pipeline for you. Ask me questions like:</p>
                                     <ul>
                                         <li>"How many leads are available?"</li>
                                         <li>"What is the total value of our opportunities?"</li>
@@ -532,17 +586,20 @@
                             </div>
 
                             <!-- CHAT LOGS -->
-                            <div v-for="msg in chatMessages" :key="msg.id" class="chat-bubble" :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'">
-                                <div class="chat-avatar" :class="msg.role === 'user' ? 'chat-avatar-user' : 'chat-avatar-assistant'">
+                            <div v-for="msg in chatMessages" :key="msg.id" class="chat-bubble"
+                                :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'">
+                                <div class="chat-avatar"
+                                    :class="msg.role === 'user' ? 'chat-avatar-user' : 'chat-avatar-assistant'">
                                     <i class="fa-solid" :class="msg.role === 'user' ? 'fa-user' : 'fa-robot'"></i>
                                 </div>
                                 <div class="chat-text">
                                     {{ msg.content }}
-                                    
+
                                     <!-- Executed SQL query disclosure -->
                                     <template v-if="msg.sql_executed">
                                         <button class="chat-sql-toggle" @click="toggleSql(msg)">
-                                            <i class="fa-solid fa-code"></i> {{ msg.showSql ? 'Hide SQL Query' : 'Inspect Executed SQL' }}
+                                            <i class="fa-solid fa-code"></i> {{ msg.showSql ? 'Hide SQL Query' :
+                                            'Inspect Executed SQL' }}
                                         </button>
                                         <pre v-if="msg.showSql" class="chat-sql-content">{{ msg.sql_executed }}</pre>
                                     </template>
@@ -565,7 +622,8 @@
                         <!-- CHAT BOX INPUT -->
                         <form @submit.prevent="sendChatMessage" class="chat-input-area">
                             <div class="chat-input-container">
-                                <input type="text" v-model="chatInput" placeholder="Ask about leads, clients, or pipeline..." :disabled="chatLoading">
+                                <input type="text" v-model="chatInput"
+                                    placeholder="Ask about leads, clients, or pipeline..." :disabled="chatLoading">
                                 <button type="submit" class="send-msg-btn" :disabled="chatLoading">
                                     <i class="fa-solid fa-paper-plane"></i>
                                 </button>
@@ -586,10 +644,12 @@
                     <div class="settings-layout">
                         <!-- Navigation Menu -->
                         <div class="settings-menu glass-panel" style="padding: 16px;">
-                            <div class="settings-tab" :class="{ active: settingsTab === 'profile' }" @click="settingsTab = 'profile'">
+                            <div class="settings-tab" :class="{ active: settingsTab === 'profile' }"
+                                @click="settingsTab = 'profile'">
                                 <i class="fa-solid fa-id-card" style="margin-right: 8px;"></i> Profile & Tenant
                             </div>
-                            <div class="settings-tab" v-if="user && user.role === 'admin'" :class="{ active: settingsTab === 'users' }" @click="settingsTab = 'users'">
+                            <div class="settings-tab" v-if="user && user.role === 'admin'"
+                                :class="{ active: settingsTab === 'users' }" @click="settingsTab = 'users'">
                                 <i class="fa-solid fa-users-gear" style="margin-right: 8px;"></i> User Management
                             </div>
                         </div>
@@ -612,11 +672,14 @@
                                             </tr>
                                             <tr>
                                                 <td>Profile Role</td>
-                                                <td><span class="tag tag-qualified" style="text-transform: uppercase;">{{ user.role }}</span></td>
+                                                <td><span class="tag tag-qualified"
+                                                        style="text-transform: uppercase;">{{ user.role }}</span></td>
                                             </tr>
                                             <tr>
                                                 <td>Status</td>
-                                                <td>Active <i class="fa-solid fa-circle" style="color: var(--color-success); font-size: 0.6rem; margin-left: 4px;"></i></td>
+                                                <td>Active <i class="fa-solid fa-circle"
+                                                        style="color: var(--color-success); font-size: 0.6rem; margin-left: 4px;"></i>
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -636,21 +699,25 @@
                                                 <i class="fa-solid fa-link"></i> Connected (Groq API Key set)
                                             </span>
                                             <span v-else class="tag tag-contacted">
-                                                <i class="fa-solid fa-triangle-exclamation"></i> Standby (Local Fallback Parser active)
+                                                <i class="fa-solid fa-triangle-exclamation"></i> Standby (Local Fallback
+                                                Parser active)
                                             </span>
                                         </div>
                                     </div>
                                     <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 12px;">
-                                        * To activate advanced Groq LLM reasoning and query conversion, configure <code>GROQ_API_KEY</code> in the server <code>.env</code> file.
+                                        * To activate advanced Groq LLM reasoning and query conversion, configure
+                                        <code>GROQ_API_KEY</code> in the server <code>.env</code> file.
                                     </p>
                                 </div>
                             </div>
 
                             <!-- B. Users Tab -->
                             <div v-if="settingsTab === 'users' && user && user.role === 'admin'">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div
+                                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                     <h3>Tenant User Accounts</h3>
-                                    <button class="btn btn-primary btn-sm" @click="openAddUser" style="padding: 6px 12px; font-size: 0.8rem;">
+                                    <button class="btn btn-primary btn-sm" @click="openAddUser"
+                                        style="padding: 6px 12px; font-size: 0.8rem;">
                                         <i class="fa-solid fa-user-plus"></i> Add Account
                                     </button>
                                 </div>
@@ -669,7 +736,9 @@
                                             <tr v-for="tu in tenantUsers" :key="tu.id">
                                                 <td style="color: white; font-weight: 500;">{{ tu.name }}</td>
                                                 <td>{{ tu.email }}</td>
-                                                <td><span class="tag" :class="tu.role === 'admin' ? 'tag-qualified' : 'tag-new'">{{ tu.role }}</span></td>
+                                                <td><span class="tag"
+                                                        :class="tu.role === 'admin' ? 'tag-qualified' : 'tag-new'">{{
+                                                        tu.role }}</span></td>
                                                 <td>{{ formatDate(tu.created_at) }}</td>
                                             </tr>
                                         </tbody>
@@ -683,7 +752,7 @@
         </div>
 
         <!-- ================== MODALS ================== -->
-        
+
         <!-- 1. CLIENT MODAL -->
         <div v-if="showClientModal" class="modal-overlay">
             <div class="modal-content glass-panel">
@@ -696,15 +765,18 @@
                 <form @submit.prevent="saveClient" style="display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-group">
                         <label>Client Name *</label>
-                        <input type="text" class="form-control" v-model="clientForm.name" required placeholder="e.g. John Doe">
+                        <input type="text" class="form-control" v-model="clientForm.name" required
+                            placeholder="e.g. John Doe">
                     </div>
                     <div class="form-group">
                         <label>Company / Organization</label>
-                        <input type="text" class="form-control" v-model="clientForm.company" placeholder="e.g. Apex Corp">
+                        <input type="text" class="form-control" v-model="clientForm.company"
+                            placeholder="e.g. Apex Corp">
                     </div>
                     <div class="form-group">
                         <label>Email Address</label>
-                        <input type="email" class="form-control" v-model="clientForm.email" placeholder="e.g. john@doe.com">
+                        <input type="email" class="form-control" v-model="clientForm.email"
+                            placeholder="e.g. john@doe.com">
                     </div>
                     <div class="form-group">
                         <label>Phone Number</label>
@@ -730,9 +802,10 @@
                 <form @submit.prevent="saveLead" style="display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-group">
                         <label>Lead Title *</label>
-                        <input type="text" class="form-control" v-model="leadForm.title" required placeholder="e.g. Cloud Consultation Contract">
+                        <input type="text" class="form-control" v-model="leadForm.title" required
+                            placeholder="e.g. Cloud Consultation Contract">
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Link Existing Client</label>
                         <select class="form-control" v-model="leadForm.client_id" style="background-color: #0b0f19;">
@@ -747,11 +820,13 @@
                     <template v-if="!leadForm.client_id">
                         <div class="form-group">
                             <label>Contact Person Name *</label>
-                            <input type="text" class="form-control" v-model="leadForm.name_fallback" placeholder="e.g. Tony Stark">
+                            <input type="text" class="form-control" v-model="leadForm.name_fallback"
+                                placeholder="e.g. Tony Stark">
                         </div>
                         <div class="form-group">
                             <label>Contact Email Address</label>
-                            <input type="email" class="form-control" v-model="leadForm.email_fallback" placeholder="e.g. tony@stark.com">
+                            <input type="email" class="form-control" v-model="leadForm.email_fallback"
+                                placeholder="e.g. tony@stark.com">
                         </div>
                     </template>
 
@@ -773,7 +848,8 @@
 
                     <div class="form-group">
                         <label>Description</label>
-                        <textarea class="form-control" v-model="leadForm.description" rows="3" placeholder="Brief notes about product interests..."></textarea>
+                        <textarea class="form-control" v-model="leadForm.description" rows="3"
+                            placeholder="Brief notes about product interests..."></textarea>
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
@@ -796,9 +872,10 @@
                 <form @submit.prevent="saveOpp" style="display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-group">
                         <label>Deal / Opportunity Title *</label>
-                        <input type="text" class="form-control" v-model="oppForm.title" required placeholder="e.g. Acme SaaS Subscription Plan">
+                        <input type="text" class="form-control" v-model="oppForm.title" required
+                            placeholder="e.g. Acme SaaS Subscription Plan">
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Link Origin Lead</label>
                         <select class="form-control" v-model="oppForm.lead_id" style="background-color: #0b0f19;">
@@ -827,7 +904,8 @@
 
                     <div class="form-group">
                         <label>Win Probability (%) *</label>
-                        <input type="number" min="0" max="100" class="form-control" v-model="oppForm.probability" required>
+                        <input type="number" min="0" max="100" class="form-control" v-model="oppForm.probability"
+                            required>
                     </div>
 
                     <div class="form-group">
@@ -837,7 +915,8 @@
 
                     <div class="form-group">
                         <label>Description</label>
-                        <textarea class="form-control" v-model="oppForm.description" rows="3" placeholder="Contract terms, SLA agreements..."></textarea>
+                        <textarea class="form-control" v-model="oppForm.description" rows="3"
+                            placeholder="Contract terms, SLA agreements..."></textarea>
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
@@ -860,15 +939,18 @@
                 <form @submit.prevent="saveUser" style="display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-group">
                         <label>Full Name *</label>
-                        <input type="text" class="form-control" v-model="userForm.name" required placeholder="e.g. John Doe">
+                        <input type="text" class="form-control" v-model="userForm.name" required
+                            placeholder="e.g. John Doe">
                     </div>
                     <div class="form-group">
                         <label>Email Address *</label>
-                        <input type="email" class="form-control" v-model="userForm.email" required placeholder="e.g. john@acme.com">
+                        <input type="email" class="form-control" v-model="userForm.email" required
+                            placeholder="e.g. john@acme.com">
                     </div>
                     <div class="form-group">
                         <label>Initial Password *</label>
-                        <input type="password" class="form-control" v-model="userForm.password" required placeholder="Min 6 characters">
+                        <input type="password" class="form-control" v-model="userForm.password" required
+                            placeholder="Min 6 characters">
                     </div>
                     <div class="form-group">
                         <label>User Role</label>
@@ -890,4 +972,5 @@
     <!-- Load App JS -->
     <script src="/js/app.js"></script>
 </body>
+
 </html>

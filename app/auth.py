@@ -49,28 +49,52 @@ def create_access_token(data: dict, expires_delta: Optional[int] = None) -> str:
     return f"{header_b64}.{payload_b64}.{signature_b64}"
 
 def decode_access_token(token: str) -> Optional[dict]:
+    print("called----------decode_access_token")
     try:
         parts = token.split('.')
+        print("[DEBUG] Token parts:", parts)
         if len(parts) != 3:
+            print("[DEBUG] Invalid token structure")
             return None
         header_b64, payload_b64, signature_b64 = parts
+
+        # Decode header and payload for logging
+        try:
+            header_json = json.loads(base64url_decode(header_b64).decode('utf-8'))
+            print("[DEBUG] Decoded header:", header_json)
+        except Exception as e:
+            header_json = None
+            print("[DEBUG] Header decode error:", e)
+        try:
+            payload_json = json.loads(base64url_decode(payload_b64).decode('utf-8'))
+            print("[DEBUG] Decoded payload (pre‑validation):", payload_json)
+        except Exception as e:
+            payload_json = None
+            print("[DEBUG] Payload decode error:", e)
         
+
         # Verify signature
         signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
         expected_sig = hmac.new(SECRET_KEY.encode('utf-8'), signing_input, hashlib.sha256).digest()
         expected_sig_b64 = base64url_encode(expected_sig)
-        
-        if not hmac.compare_digest(signature_b64, expected_sig_b64):
+        signature_valid = hmac.compare_digest(signature_b64, expected_sig_b64)
+        print("[DEBUG] Signature valid:", signature_valid)
+        if not signature_valid:
             return None
-            
-        payload = json.loads(base64url_decode(payload_b64).decode('utf-8'))
-        
+
+        # At this point payload_json should be a dict
+        payload = payload_json
         # Check expiration
-        if payload.get("exp", 0) < time.time():
+        exp = payload.get("exp", 0)
+        now = time.time()
+        print(f"[DEBUG] Expiration check – exp: {exp}, now: {now}, valid: {exp > now}")
+        if exp < now:
             return None
-            
+
+        print("[DEBUG] Token successfully validated and decoded")
         return payload
-    except Exception:
+    except Exception as e:
+        print("[DEBUG] Unexpected error during decode_access_token:", e)
         return None
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:

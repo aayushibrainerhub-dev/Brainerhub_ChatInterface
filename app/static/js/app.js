@@ -4,6 +4,8 @@ createApp({
     setup() {
         // --- Authentication & View States ---
         const token = ref(localStorage.getItem("crm_token") || "");
+        const jwtToken = ref(token.value);
+        watch(token, (val) => { jwtToken.value = val; });
         const currentView = ref("login");
         const settingsTab = ref("profile");
         const user = ref(null);
@@ -11,7 +13,9 @@ createApp({
         const groqConfigured = ref(false);
         const loginForm = ref({ email: "", password: "" });
         const loginError = ref("");
-        
+        // Removed jwtPayload ref (backend debugging only)
+        const meResult = ref(null);
+
         const registerForm = ref({
             signup_type: "create_tenant",
             tenant_name: "",
@@ -34,7 +38,7 @@ createApp({
         const pageLoading = ref(false);
         const chatLoading = ref(false);
         const chatInput = ref("");
-        
+
         // --- Modals visibility ---
         const showClientModal = ref(false);
         const showLeadModal = ref(false);
@@ -70,13 +74,13 @@ createApp({
                 "Content-Type": "application/json",
                 ...options.headers
             };
-            
+
             if (token.value) {
                 headers["Authorization"] = `Bearer ${token.value}`;
             }
 
             const response = await fetch(url, { ...options, headers });
-            
+
             if (response.status === 401) {
                 // Token expired or invalid
                 logout();
@@ -89,21 +93,35 @@ createApp({
             }
 
             return response.json();
+        }
+
+        const testMeEndpoint = async () => {
+            if (!token.value) return;
+            try {
+                const data = await apiRequest('/api/auth/me', { method: 'GET' });
+                meResult.value = JSON.stringify(data, null, 2);
+            } catch (err) {
+                meResult.value = `Error: ${err.message}`;
+            }
         };
+
 
         // --- Auth functions ---
         const handleLogin = async () => {
-            loginError.value = "";
+            console.log('🔧 handleLogin invoked');
             pageLoading.value = true;
             try {
                 const data = await apiRequest("/api/auth/login", {
                     method: "POST",
                     body: JSON.stringify(loginForm.value)
                 });
-                
+
                 token.value = data.access_token;
                 localStorage.setItem("crm_token", data.access_token);
-                
+                console.log('✅ Login successful');
+                console.log('🔑 Token:', token.value);
+                // JWT payload debugging removed
+
                 await loadUserProfile();
             } catch (err) {
                 loginError.value = err.message;
@@ -160,11 +178,14 @@ createApp({
             try {
                 const me = await apiRequest("/api/auth/me");
                 user.value = me;
-                
+                console.log('👤 User profile loaded:', user.value);
+
                 // Get Tenant and Groq Settings
                 const config = await apiRequest("/api/settings");
                 tenant.value = config.tenant;
+                console.log('🏢 Tenant:', tenant.value);
                 groqConfigured.value = config.groq_configured;
+                console.log('⚙️ Groq configured:', groqConfigured.value);
 
                 // Route user based on role
                 if (user.value.role === "admin") {
@@ -190,7 +211,7 @@ createApp({
         // --- Navigation ---
         const switchView = (view) => {
             currentView.value = view;
-            
+
             // Fetch relevant view data
             if (view === "register") {
                 loadAllTenants();
@@ -214,7 +235,7 @@ createApp({
             try {
                 const data = await apiRequest("/api/dashboard");
                 stats.value = data;
-                
+
                 // Render charts after DOM updates
                 nextTick(() => {
                     renderCharts();
@@ -360,24 +381,24 @@ createApp({
         };
 
         const openAddLead = () => {
-            leadForm.value = { 
-                id: null, 
-                client_id: "", 
-                name_fallback: "", 
-                email_fallback: "", 
-                title: "", 
-                description: "", 
-                status: "New", 
-                value: 0 
+            leadForm.value = {
+                id: null,
+                client_id: "",
+                name_fallback: "",
+                email_fallback: "",
+                title: "",
+                description: "",
+                status: "New",
+                value: 0
             };
             showLeadModal.value = true;
         };
 
         const openEditLead = (l) => {
-            leadForm.value = { 
-                ...l, 
-                client_id: l.client_id || "", 
-                value: parseFloat(l.value) 
+            leadForm.value = {
+                ...l,
+                client_id: l.client_id || "",
+                value: parseFloat(l.value)
             };
             showLeadModal.value = true;
         };
@@ -436,23 +457,23 @@ createApp({
         };
 
         const openAddOpp = () => {
-            oppForm.value = { 
-                id: null, 
-                lead_id: "", 
-                title: "", 
-                description: "", 
-                stage: "Discovery", 
-                value: 0, 
-                probability: 10, 
-                close_date: "" 
+            oppForm.value = {
+                id: null,
+                lead_id: "",
+                title: "",
+                description: "",
+                stage: "Discovery",
+                value: 0,
+                probability: 10,
+                close_date: ""
             };
             showOppModal.value = true;
         };
 
         const openEditOpp = (o) => {
-            oppForm.value = { 
-                ...o, 
-                lead_id: o.lead_id || "", 
+            oppForm.value = {
+                ...o,
+                lead_id: o.lead_id || "",
                 value: parseFloat(o.value),
                 close_date: o.close_date || ""
             };
@@ -614,8 +635,7 @@ createApp({
         });
 
         return {
-            // States
-            token,
+            token, meResult, testMeEndpoint,
             currentView,
             settingsTab,
             user,
@@ -631,7 +651,7 @@ createApp({
             chatInput,
             chatMessages,
             stats,
-            
+
             // CRUD collections
             clients,
             leads,
@@ -654,7 +674,7 @@ createApp({
             loadAllTenants,
             logout,
             switchView,
-            
+
             // Clients operations
             openAddClient,
             openEditClient,
@@ -676,7 +696,7 @@ createApp({
             // Chat operations
             sendChatMessage,
             toggleSql,
-            
+
             // Settings operations
             openAddUser,
             saveUser,
