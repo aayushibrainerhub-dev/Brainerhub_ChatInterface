@@ -83,6 +83,7 @@ class LeadCreate(BaseModel):
     description: Optional[str] = None
     status: str = "New"  # 'New', 'Contacted', 'Qualified', 'Lost', 'Won'
     value: Decimal = Field(default=Decimal("0.00"))
+    industry_type: Optional[str] = None  # Raw industry text entered by user
 
 class LeadUpdate(BaseModel):
     client_id: Optional[int] = None
@@ -92,6 +93,7 @@ class LeadUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
     value: Optional[Decimal] = None
+    industry_type: Optional[str] = None  # Raw industry text entered by user
 
 class LeadResponse(ConfigBase):
     id: int
@@ -103,6 +105,8 @@ class LeadResponse(ConfigBase):
     description: Optional[str] = None
     status: str
     value: Decimal
+    industry_type: Optional[str] = None
+    industry_category: Optional[str] = None
     created_at: datetime.datetime
     client: Optional[ClientResponse] = None
 
@@ -152,3 +156,71 @@ class ChatQueryResponse(BaseModel):
     response: str
     sql_executed: Optional[str] = None
     raw_results: Optional[List[dict]] = None
+
+# --- Clustering API Schemas ---
+class ClusterRequest(BaseModel):
+    """
+    Request model for the /cluster endpoint.
+
+    Attributes
+    ----------
+    texts : List[str]
+        The raw documents to be embedded and clustered.
+    approach : Optional[str]
+        Embedding strategy – "tfidf" (default) or "embeddings".
+        "embeddings" triggers Sentence‑Transformer encoding; if the
+        ``sentence‑transformers`` package cannot be imported the code
+        gracefully falls back to TF‑IDF.
+    """
+    texts: List[str]
+    approach: Optional[str] = "tfidf"
+
+class ClusterResponse(BaseModel):
+    """
+    Response model returned by the /cluster endpoint.
+
+    Attributes
+    ----------
+    labels : List[int]
+        Cluster assignment for each input text (``-1`` for noise when HDBSCAN is used).
+    embedding_shape : Tuple[int, int]
+        Shape of the (normalized) embedding matrix produced by the chosen
+        embedding method.
+    message : Optional[str]
+        Human‑readable status message.
+    """
+    labels: List[int]
+    embedding_shape: Tuple[int, int]
+    message: Optional[str] = None
+
+class IndustryPredictRequest(BaseModel):
+    """Request model for predicting industry clusters.
+
+    Attributes
+    ----------
+    industries: List[str]
+        List of raw industry strings to classify.
+    """
+    industries: List[str]
+
+class IndustryPredictResponse(BaseModel):
+    """Response model returning predicted cluster IDs.
+
+    Attributes
+    ----------
+    predictions: List[int]
+        Predicted cluster IDs for each input industry.
+    """
+    predictions: List[int]
+
+
+class ClusterPredictDetail(BaseModel):
+    industry: str
+    cluster_id: int
+    cluster_name: str
+    similarity: float
+
+
+class ClusterPredictResponse(BaseModel):
+    results: List[ClusterPredictDetail]
+

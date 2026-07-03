@@ -1,4 +1,6 @@
-const { createApp, ref, onMounted, nextTick, watch } = Vue;
+import { createApp, ref, onMounted, nextTick, watch } from 'vue'
+import Chart from 'chart.js/auto'
+import './style.css'
 
 createApp({
     setup() {
@@ -13,7 +15,6 @@ createApp({
         const groqConfigured = ref(false);
         const loginForm = ref({ email: "", password: "" });
         const loginError = ref("");
-        // Removed jwtPayload ref (backend debugging only)
         const meResult = ref(null);
 
         const registerForm = ref({
@@ -47,9 +48,10 @@ createApp({
 
         // --- CRUD Form bindings ---
         const clientForm = ref({ id: null, name: "", email: "", phone: "", company: "" });
-        const leadForm = ref({ id: null, client_id: "", name_fallback: "", email_fallback: "", title: "", description: "", status: "New", value: 0 });
+        const leadForm = ref({ id: null, client_id: "", name_fallback: "", email_fallback: "", title: "", description: "", status: "New", value: 0, industry_type: "" });
         const oppForm = ref({ id: null, lead_id: "", title: "", description: "", stage: "Discovery", value: 0, probability: 10, close_date: "" });
         const userForm = ref({ email: "", password: "", name: "", role: "user" });
+
 
         // --- Dashboard Stats ---
         const stats = ref({
@@ -69,7 +71,13 @@ createApp({
         let oppChartInstance = null;
 
         // --- Helper API request wrapper ---
-        const apiRequest = async (url, options = {}) => {
+        // By pointing directly to the backend URL, we rely on FastAPI's CORS
+        // configuration instead of Vite's proxy.
+        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+        const apiRequest = async (endpoint, options = {}) => {
+            const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+            
             const headers = {
                 "Content-Type": "application/json",
                 ...options.headers
@@ -82,7 +90,6 @@ createApp({
             const response = await fetch(url, { ...options, headers });
 
             if (response.status === 401) {
-                // Token expired or invalid
                 logout();
                 throw new Error("Session expired. Please log in again.");
             }
@@ -119,9 +126,6 @@ createApp({
                 token.value = data.access_token;
                 localStorage.setItem("crm_token", data.access_token);
                 console.log('✅ Login successful');
-                console.log('🔑 Token:', token.value);
-                // JWT payload debugging removed
-
                 await loadUserProfile();
             } catch (err) {
                 loginError.value = err.message;
@@ -180,14 +184,10 @@ createApp({
                 user.value = me;
                 console.log('👤 User profile loaded:', user.value);
 
-                // Get Tenant and Groq Settings
                 const config = await apiRequest("/api/settings");
                 tenant.value = config.tenant;
-                console.log('🏢 Tenant:', tenant.value);
                 groqConfigured.value = config.groq_configured;
-                console.log('⚙️ Groq configured:', groqConfigured.value);
 
-                // Route user based on role
                 if (user.value.role === "admin") {
                     switchView("dashboard");
                 } else {
@@ -212,16 +212,15 @@ createApp({
         const switchView = (view) => {
             currentView.value = view;
 
-            // Fetch relevant view data
             if (view === "register") {
                 loadAllTenants();
             } else if (view === "dashboard" && user.value?.role === "admin") {
                 loadDashboardData();
-            } else if (view === "clients" && user.value?.role === "admin") {
+            } else if (view === "clients") {
                 loadClients();
-            } else if (view === "leads" && user.value?.role === "admin") {
+            } else if (view === "leads" && (user.value?.role === "admin" || user.value?.role === "user")) {
                 loadLeads();
-            } else if (view === "opportunities" && user.value?.role === "admin") {
+            } else if (view === "opportunities" && (user.value?.role === "admin" || user.value?.role === "user")) {
                 loadOpportunities();
             } else if (view === "chat" && user.value?.role === "user") {
                 loadChatHistory();
@@ -236,7 +235,6 @@ createApp({
                 const data = await apiRequest("/api/dashboard");
                 stats.value = data;
 
-                // Render charts after DOM updates
                 nextTick(() => {
                     renderCharts();
                 });
@@ -251,11 +249,9 @@ createApp({
 
             if (!leadCtx || !oppCtx) return;
 
-            // Destroy previous charts to avoid canvas overlaps
             if (leadChartInstance) leadChartInstance.destroy();
             if (oppChartInstance) oppChartInstance.destroy();
 
-            // 1. Lead Doughnut Chart
             const leadData = stats.value.lead_status_distribution;
             const leadLabels = Object.keys(leadData);
             const leadValues = Object.values(leadData);
@@ -283,7 +279,6 @@ createApp({
                 }
             });
 
-            // 2. Opportunities Bar Chart
             const oppData = stats.value.opportunity_stage_distribution;
             const oppLabels = Object.keys(oppData);
             const oppValues = Object.values(oppData);
@@ -332,11 +327,15 @@ createApp({
 
         const openAddClient = () => {
             clientForm.value = { id: null, name: "", email: "", phone: "", company: "" };
+            clientIndustryInput.value = "";
+            clientClusterResult.value = null;
             showClientModal.value = true;
         };
 
         const openEditClient = (c) => {
             clientForm.value = { ...c };
+            clientIndustryInput.value = "";
+            clientClusterResult.value = null;
             showClientModal.value = true;
         };
 
@@ -370,11 +369,15 @@ createApp({
             }
         };
 
+        const navigateFromClient = (clientId) => {
+            switchView("leads");
+        };
+
         // --- Leads Actions ---
         const loadLeads = async () => {
             try {
                 leads.value = await apiRequest("/api/leads");
-                await loadClients(); // Needed for client list dropdown in form
+                await loadClients();
             } catch (err) {
                 console.error("Error loading leads", err);
             }
@@ -389,7 +392,8 @@ createApp({
                 title: "",
                 description: "",
                 status: "New",
-                value: 0
+                value: 0,
+                industry_type: ""
             };
             showLeadModal.value = true;
         };
@@ -398,14 +402,14 @@ createApp({
             leadForm.value = {
                 ...l,
                 client_id: l.client_id || "",
-                value: parseFloat(l.value)
+                value: parseFloat(l.value),
+                industry_type: l.industry_type || ""
             };
             showLeadModal.value = true;
         };
 
         const saveLead = async () => {
             try {
-                // Formatting payload
                 const payload = { ...leadForm.value };
                 if (payload.client_id === "") payload.client_id = null;
                 if (!payload.client_id) {
@@ -446,11 +450,15 @@ createApp({
             }
         };
 
+        const navigateFromLead = (leadId) => {
+            switchView("opportunities");
+        };
+
         // --- Opportunities Actions ---
         const loadOpportunities = async () => {
             try {
                 opportunities.value = await apiRequest("/api/opportunities");
-                await loadLeads(); // Needed for lead list dropdown in form
+                await loadLeads();
             } catch (err) {
                 console.error("Error loading opportunities", err);
             }
@@ -512,6 +520,14 @@ createApp({
             } catch (err) {
                 alert("Error deleting opportunity: " + err.message);
             }
+        };
+
+        const navigateFromOpportunity = (leadId) => {
+            switchView("leads");
+        };
+
+        const navigateFromOppToClient = (opp) => {
+            switchView("clients");
         };
 
         // --- Chat Operations ---
@@ -625,6 +641,25 @@ createApp({
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         };
 
+        // --- Industry Cluster Prediction Helpers ---
+        const predictClientCluster = async () => {
+            const text = clientIndustryInput.value.trim();
+            if (!text) return;
+            clientClusterLoading.value = true;
+            clientClusterResult.value = null;
+            try {
+                const data = await apiRequest("/api/cluster/predict", {
+                    method: "POST",
+                    body: JSON.stringify({ industries: [text] })
+                });
+                clientClusterResult.value = data.results[0];
+            } catch (err) {
+                clientClusterResult.value = { error: err.message };
+            } finally {
+                clientClusterLoading.value = false;
+            }
+        };
+
         // --- Lifecycle ---
         onMounted(() => {
             if (token.value) {
@@ -652,13 +687,11 @@ createApp({
             chatMessages,
             stats,
 
-            // CRUD collections
             clients,
             leads,
             opportunities,
             tenantUsers,
 
-            // Forms & Modals
             showClientModal,
             showLeadModal,
             showOppModal,
@@ -668,42 +701,41 @@ createApp({
             oppForm,
             userForm,
 
-            // Actions
             handleLogin,
             handleRegister,
             loadAllTenants,
             logout,
             switchView,
 
-            // Clients operations
             openAddClient,
             openEditClient,
             saveClient,
             deleteClient,
+            navigateFromClient,
 
-            // Leads operations
             openAddLead,
             openEditLead,
             saveLead,
             deleteLead,
+            navigateFromLead,
 
-            // Opportunities operations
             openAddOpp,
             openEditOpp,
             saveOpp,
             deleteOpp,
+            navigateFromOpportunity,
+            navigateFromOppToClient,
 
-            // Chat operations
             sendChatMessage,
             toggleSql,
 
-            // Settings operations
             openAddUser,
             saveUser,
 
-            // Formatting
             formatCurrency,
-            formatDate
+            formatDate,
+
+            clientIndustryInput, clientClusterResult, clientClusterLoading, predictClientCluster,
         };
     }
 }).mount("#app");

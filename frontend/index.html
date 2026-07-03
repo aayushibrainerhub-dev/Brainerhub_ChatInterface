@@ -5,13 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brainerhub Chat CRM</title>
-    <!-- Fonts -->
-    <link rel="stylesheet" href="/css/styles.css">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Vue 3 and Chart.js CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -79,7 +74,7 @@
         </div>
 
         <!-- 1.5. REGISTER VIEW -->
-        <div v-if="currentView === 'register'" class="login-view">
+        <div v-else-if="currentView === 'register'" class="login-view">
             <div class="login-card glass-panel" style="max-width: 460px;">
                 <div class="login-logo">
                     <div class="logo-container">
@@ -148,7 +143,7 @@
 
                     <button type="submit" class="btn btn-primary"
                         style="justify-content: center; width: 100%; margin-top: 8px;">
-                        Register & Get Started <i class="fa-solid fa-user-check"></i>
+                        Register &amp; Get Started <i class="fa-solid fa-user-check"></i>
                     </button>
                 </form>
 
@@ -178,8 +173,7 @@
                 </span>
 
                 <ul class="nav-menu">
-                    <!-- ADMIN-ONLY VIEWS -->
-                    <template v-if="user && user.role === 'admin'">
+                    <template v-if="user && (user.role === 'admin' || user.role === 'user')">
                         <li class="nav-item" :class="{ active: currentView === 'dashboard' }">
                             <a href="#" @click.prevent="switchView('dashboard')">
                                 <i class="fa-solid fa-chart-pie"></i> Dashboard
@@ -366,7 +360,7 @@
                             <h1>Clients Database</h1>
                             <p>Manage companies and contacts for your organization</p>
                         </div>
-                        <button class="btn btn-primary" @click="openAddClient">
+                        <button class="btn btn-primary" v-if="user && user.role === 'user'" @click="openAddClient">
                             <i class="fa-solid fa-user-plus"></i> Add Client
                         </button>
                     </div>
@@ -399,6 +393,10 @@
                                                     title="Delete Client">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </button>
+                                                <button class="action-btn" v-if="user && user.role === 'user'"
+                                                    @click="navigateFromClient(c.id)" title="View Leads">
+                                                    <i class="fa-solid fa-arrow-right"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -421,7 +419,7 @@
                             <h1>Leads Management</h1>
                             <p>Track potential sales contacts and prospective pipeline additions</p>
                         </div>
-                        <button class="btn btn-primary" @click="openAddLead">
+                        <button class="btn btn-primary" v-if="user && user.role === 'user'" @click="openAddLead">
                             <i class="fa-solid fa-square-plus"></i> Create Lead
                         </button>
                     </div>
@@ -433,6 +431,7 @@
                                     <tr>
                                         <th>Title</th>
                                         <th>Company / Client</th>
+                                        <th>Industry Category</th>
                                         <th>Status</th>
                                         <th>Value</th>
                                         <th>Date Added</th>
@@ -447,6 +446,14 @@
                                                 }} ({{ l.client.company }})</span>
                                             <span v-else><i class="fa-regular fa-user"></i> {{ l.name_fallback }}</span>
                                         </td>
+                                        <td>
+                                            <span v-if="l.industry_category"
+                                                class="tag"
+                                                style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #a5b4fc; font-size: 0.75rem;">
+                                                <i class="fa-solid fa-tag"></i> {{ l.industry_category }}
+                                            </span>
+                                            <span v-else style="color: var(--text-muted); font-size: 0.8rem;">—</span>
+                                        </td>
                                         <td><span class="tag" :class="'tag-' + l.status.toLowerCase()">{{ l.status
                                                 }}</span></td>
                                         <td style="font-weight: 600; color: #10b981;">{{ formatCurrency(l.value) }}</td>
@@ -460,11 +467,15 @@
                                                     title="Delete Lead">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </button>
+                                                <button class="action-btn" v-if="user && user.role === 'user'"
+                                                    @click="navigateFromLead(l.id)" title="View Opportunities">
+                                                    <i class="fa-solid fa-arrow-right"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
                                     <tr v-if="leads.length === 0">
-                                        <td colspan="6"
+                                        <td colspan="7"
                                             style="text-align: center; padding: 40px 0; color: var(--text-muted);">
                                             No sales leads logged. Click 'Create Lead' to register a new prospect.
                                         </td>
@@ -482,7 +493,7 @@
                             <h1>Opportunities (Deals)</h1>
                             <p>Track active transactions, deal probability, and expected closed valuations</p>
                         </div>
-                        <button class="btn btn-primary" @click="openAddOpp">
+                        <button class="btn btn-primary" v-if="user && user.role === 'user'" @click="openAddOpp">
                             <i class="fa-solid fa-folder-plus"></i> Add Opportunity
                         </button>
                     </div>
@@ -504,7 +515,13 @@
                                 <tbody>
                                     <tr v-for="o in opportunities" :key="o.id">
                                         <td style="font-weight: 600; color: white;">{{ o.title }}</td>
-                                        <td>{{ o.lead ? o.lead.title : 'Direct' }}</td>
+                                        <td>
+                                            <a href="#" @click.prevent="navigateFromOpportunity(o.lead_id)"
+                                                v-if="o.lead" class="link">
+                                                {{ o.lead.title }}
+                                            </a>
+                                            <span v-else>Direct</span>
+                                        </td>
                                         <td><span class="tag"
                                                 :class="'tag-' + o.stage.replace(' ', '').toLowerCase()">{{ o.stage
                                                 }}</span></td>
@@ -530,6 +547,10 @@
                                                 <button class="action-btn delete-btn" @click="deleteOpp(o.id)"
                                                     title="Delete Opportunity">
                                                     <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                                <button class="action-btn" v-if="user && user.role === 'user'"
+                                                    @click="navigateFromOppToClient(o)" title="View Client">
+                                                    <i class="fa-solid fa-user"></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -594,15 +615,6 @@
                                 </div>
                                 <div class="chat-text">
                                     {{ msg.content }}
-
-                                    <!-- Executed SQL query disclosure -->
-                                    <template v-if="msg.sql_executed">
-                                        <button class="chat-sql-toggle" @click="toggleSql(msg)">
-                                            <i class="fa-solid fa-code"></i> {{ msg.showSql ? 'Hide SQL Query' :
-                                            'Inspect Executed SQL' }}
-                                        </button>
-                                        <pre v-if="msg.showSql" class="chat-sql-content">{{ msg.sql_executed }}</pre>
-                                    </template>
                                 </div>
                             </div>
 
@@ -646,7 +658,7 @@
                         <div class="settings-menu glass-panel" style="padding: 16px;">
                             <div class="settings-tab" :class="{ active: settingsTab === 'profile' }"
                                 @click="settingsTab = 'profile'">
-                                <i class="fa-solid fa-id-card" style="margin-right: 8px;"></i> Profile & Tenant
+                                <i class="fa-solid fa-id-card" style="margin-right: 8px;"></i> Profile &amp; Tenant
                             </div>
                             <div class="settings-tab" v-if="user && user.role === 'admin'"
                                 :class="{ active: settingsTab === 'users' }" @click="settingsTab = 'users'">
@@ -782,6 +794,42 @@
                         <label>Phone Number</label>
                         <input type="text" class="form-control" v-model="clientForm.phone" placeholder="e.g. 555-0199">
                     </div>
+
+                    <!-- AI Industry Cluster Detection -->
+                    <div class="form-group"
+                        style="border: 1px solid rgba(99,102,241,0.25); border-radius: 10px; padding: 14px; background: rgba(99,102,241,0.05);">
+                        <label
+                            style="color: var(--accent-indigo); font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-brain"></i> AI Industry Detector
+                        </label>
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <input type="text" class="form-control" v-model="clientIndustryInput"
+                                placeholder="e.g. Cloud Software, Retail Banking..." style="flex: 1;"
+                                @keyup.enter="predictClientCluster">
+                            <button type="button" class="btn btn-primary btn-sm" @click="predictClientCluster"
+                                :disabled="clientClusterLoading"
+                                style="white-space: nowrap; padding: 8px 14px; font-size: 0.8rem;">
+                                <i class="fa-solid fa-magnifying-glass-chart" v-if="!clientClusterLoading"></i>
+                                <i class="fa-solid fa-circle-notch fa-spin" v-else></i>
+                                {{ clientClusterLoading ? 'Detecting...' : 'Detect' }}
+                            </button>
+                        </div>
+                        <div v-if="clientClusterResult && !clientClusterResult.error"
+                            style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 10px 14px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-tag" style="color: #10b981;"></i>
+                                <span style="color: white; font-weight: 600;">{{ clientClusterResult.cluster_name
+                                    }}</span>
+                            </div>
+                            <span style="font-size: 0.78rem; color: #10b981; font-weight: 700;">
+                                {{ Math.round(clientClusterResult.similarity * 100) }}% match
+                            </span>
+                        </div>
+                        <div v-if="clientClusterResult && clientClusterResult.error"
+                            style="margin-top: 10px; color: var(--color-danger); font-size: 0.82rem;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> {{ clientClusterResult.error }}
+                        </div>
+                    </div>
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
                         <button type="button" class="btn btn-secondary" @click="showClientModal = false">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Profile</button>
@@ -816,7 +864,6 @@
                         </select>
                     </div>
 
-                    <!-- Fallback contact info if no client is selected -->
                     <template v-if="!leadForm.client_id">
                         <div class="form-group">
                             <label>Contact Person Name *</label>
@@ -850,6 +897,17 @@
                         <label>Description</label>
                         <textarea class="form-control" v-model="leadForm.description" rows="3"
                             placeholder="Brief notes about product interests..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Industry Type</label>
+                        <input type="text" class="form-control" v-model="leadForm.industry_type"
+                            placeholder="e.g. Hospitality, FinTech, SaaS, Healthcare..."
+                            title="The AI will auto-detect the industry category when the lead is saved.">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">
+                            <i class="fa-solid fa-brain" style="color: var(--accent-indigo);"></i>
+                            AI will auto-classify the industry category when saved.
+                        </p>
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
@@ -969,8 +1027,8 @@
 
     </div>
 
-    <!-- Load App JS -->
-    <script src="/js/app.js"></script>
+    <!-- Vite entry point — loads Vue + app logic as ES module -->
+    <script type="module" src="/src/main.js"></script>
 </body>
 
 </html>

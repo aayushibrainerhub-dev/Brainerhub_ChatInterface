@@ -62,6 +62,8 @@ class Lead(Base):
     description = Column(Text, nullable=True)
     status = Column(String(50), default="New")  # 'New', 'Contacted', 'Qualified', 'Lost', 'Won'
     value = Column(Numeric(12, 2), default=0.0)
+    industry_type = Column(String(150), nullable=True)      # Raw industry text entered by user
+    industry_category = Column(String(150), nullable=True)  # ML-predicted cluster name
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships

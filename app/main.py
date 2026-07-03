@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -14,29 +15,101 @@ from app.schemas import (
     LeadCreate, LeadUpdate, LeadResponse,
     OpportunityCreate, OpportunityUpdate, OpportunityResponse,
     ChatMessageCreate, ChatMessageResponse, ChatQueryResponse,
-    RegisterRequest, TenantResponse
+    RegisterRequest, TenantResponse,
+    # Newly added clustering schemas
+    ClusterRequest, ClusterResponse,
+    # Cluster prediction schemas
+    IndustryPredictRequest, ClusterPredictResponse,
 )
+
+# Import the inference helper for the cluster metadata model
+from machine_learning.cluster_inference import predict_cluster_semantic
+
+
+# Import authentication utilities
 from app.auth import create_access_token, get_current_user, require_admin, require_user, verify_password
 from app.chat_engine import CRMQueryEngine
+
+# Initialize FastAPI app
+app = FastAPI(title="Brainerhub Chat CRM", description="Multi-tenant CRM with LLM-powered Chat-with-Data")
 
 # Initialize DB on startup
 init_db()
 
-app = FastAPI(title="Brainerhub Chat CRM", description="Multi-tenant CRM with LLM-powered Chat-with-Data")
+# Root route – serve frontend if built, else simple JSON
+from fastapi.responses import FileResponse
 
-# Enable CORS for local testing if needed
+@app.get("/", tags=["Root"])
+def read_root():
+    frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
+    index_file = frontend_path / "index.html"
+    if index_file.is_file():
+        return FileResponse(index_file)
+    return {"message": "Welcome to Brainerhub Chat CRM API"}
+
+
+# Root health check
+@app.get("/", tags=["Root"])
+def read_root():
+    return {"message": "Welcome to Brainerhub Chat CRM API"}
+
+
+# --- Clustering Endpoint ---------------------------------------------------
+#
+# Enable CORS for explicit frontend domains (Security Best Practice)
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:4040",
+    "https://emptier-bounding-bullring.ngrok-free.dev",
+    ""
+    # "https://www.yourproductiondomain.com" # Add production URL here later
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Chat Engine Instance
+# Public URL for tunnel (ngrok or Cloudflare)
+import os
+PUBLIC_URL: str = os.getenv("PUBLIC_URL", "http://localhost:8000")
+
+# Chat Engine1 Instance
 chat_engine = CRMQueryEngine()
 
-# --- Authentication Endpoints ---
+
+# --- Machine Learning Endpoints ---
+@app.post("/api/cluster/predict", response_model=ClusterPredictResponse)
+def predict_industry_cluster(request: IndustryPredictRequest):
+    """
+    Predict the industry clusters for a list of raw industry description strings
+    using nearest-centroid matching against the saved cluster_metadata.pkl model.
+    """
+    try:
+        results = predict_cluster_semantic(request.industries)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Cluster inference error: {str(e)}"
+        )
+
+@app.get("/api/public-url", response_model=str, tags=["Utility"])
+async def get_public_url() -> str:
+    """
+    Return the base URL that the frontend should use to call the backend.
+    This reads from the PUBLIC_URL environment variable, falling back to
+    the local development address.
+    """
+    return PUBLIC_URL
+
+# --- Authentication Endpoints --- 
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == request.email).first()
@@ -207,11 +280,11 @@ def get_dashboard_stats(current_user: User = Depends(get_current_user), db: Sess
 
 # --- Clients Endpoints ---
 @app.get("/api/clients", response_model=List[ClientResponse])
-def list_clients(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def list_clients(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Client).filter(Client.tenant_id == current_user.tenant_id).order_by(Client.name.asc()).all()
 
 @app.post("/api/clients", response_model=ClientResponse)
-def create_client(client_data: ClientCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def create_client(client_data: ClientCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     db_client = Client(
         tenant_id=current_user.tenant_id,
         name=client_data.name,
@@ -225,7 +298,7 @@ def create_client(client_data: ClientCreate, current_user: User = Depends(requir
     return db_client
 
 @app.put("/api/clients/{client_id}", response_model=ClientResponse)
-def update_client(client_id: int, client_data: ClientUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def update_client(client_id: int, client_data: ClientUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     db_client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == current_user.tenant_id).first()
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -238,7 +311,7 @@ def update_client(client_id: int, client_data: ClientUpdate, current_user: User 
     return db_client
 
 @app.delete("/api/clients/{client_id}")
-def delete_client(client_id: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def delete_client(client_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     db_client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == current_user.tenant_id).first()
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -250,16 +323,26 @@ def delete_client(client_id: int, current_user: User = Depends(require_admin), d
 
 # --- Leads Endpoints ---
 @app.get("/api/leads", response_model=List[LeadResponse])
-def list_leads(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def list_leads(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Lead).filter(Lead.tenant_id == current_user.tenant_id).order_by(Lead.created_at.desc()).all()
 
 @app.post("/api/leads", response_model=LeadResponse)
-def create_lead(lead_data: LeadCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def create_lead(lead_data: LeadCreate, current_user: User = Depends(require_user), db: Session = Depends(get_db)):
     # Validate client if client_id is provided
     if lead_data.client_id:
         client = db.query(Client).filter(Client.id == lead_data.client_id, Client.tenant_id == current_user.tenant_id).first()
         if not client:
             raise HTTPException(status_code=400, detail="Invalid client ID specified")
+
+    # Auto-predict industry category from industry_type using ML model
+    predicted_category = None
+    if lead_data.industry_type and lead_data.industry_type.strip():
+        try:
+            results = predict_cluster_semantic([lead_data.industry_type.strip()])
+            if results:
+                predicted_category = results[0].get("cluster_name")
+        except Exception:
+            predicted_category = None  # Non-fatal: proceed without prediction
 
     db_lead = Lead(
         tenant_id=current_user.tenant_id,
@@ -269,7 +352,9 @@ def create_lead(lead_data: LeadCreate, current_user: User = Depends(require_admi
         title=lead_data.title,
         description=lead_data.description,
         status=lead_data.status,
-        value=lead_data.value
+        value=lead_data.value,
+        industry_type=lead_data.industry_type,
+        industry_category=predicted_category
     )
     db.add(db_lead)
     db.commit()
@@ -277,7 +362,7 @@ def create_lead(lead_data: LeadCreate, current_user: User = Depends(require_admi
     return db_lead
 
 @app.put("/api/leads/{lead_id}", response_model=LeadResponse)
-def update_lead(lead_id: int, lead_data: LeadUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def update_lead(lead_id: int, lead_data: LeadUpdate, current_user: User = Depends(require_user), db: Session = Depends(get_db)):
     db_lead = db.query(Lead).filter(Lead.id == lead_id, Lead.tenant_id == current_user.tenant_id).first()
     if not db_lead:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -286,16 +371,27 @@ def update_lead(lead_id: int, lead_data: LeadUpdate, current_user: User = Depend
         client = db.query(Client).filter(Client.id == lead_data.client_id, Client.tenant_id == current_user.tenant_id).first()
         if not client:
             raise HTTPException(status_code=400, detail="Invalid client ID specified")
-        
-    for key, value in lead_data.model_dump(exclude_unset=True).items():
+
+    update_dict = lead_data.model_dump(exclude_unset=True)
+
+    # If industry_type is being updated, re-run the ML prediction
+    if "industry_type" in update_dict and update_dict["industry_type"] and update_dict["industry_type"].strip():
+        try:
+            results = predict_cluster_semantic([update_dict["industry_type"].strip()])
+            if results:
+                update_dict["industry_category"] = results[0].get("cluster_name")
+        except Exception:
+            pass  # Non-fatal: keep existing category
+
+    for key, value in update_dict.items():
         setattr(db_lead, key, value)
-        
+
     db.commit()
     db.refresh(db_lead)
     return db_lead
 
 @app.delete("/api/leads/{lead_id}")
-def delete_lead(lead_id: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def delete_lead(lead_id: int, current_user: User = Depends(require_user), db: Session = Depends(get_db)):
     db_lead = db.query(Lead).filter(Lead.id == lead_id, Lead.tenant_id == current_user.tenant_id).first()
     if not db_lead:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -307,11 +403,11 @@ def delete_lead(lead_id: int, current_user: User = Depends(require_admin), db: S
 
 # --- Opportunities Endpoints ---
 @app.get("/api/opportunities", response_model=List[OpportunityResponse])
-def list_opportunities(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def list_opportunities(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Opportunity).filter(Opportunity.tenant_id == current_user.tenant_id).order_by(Opportunity.created_at.desc()).all()
 
 @app.post("/api/opportunities", response_model=OpportunityResponse)
-def create_opportunity(opp_data: OpportunityCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def create_opportunity(opp_data: OpportunityCreate, current_user: User = Depends(require_user), db: Session = Depends(get_db)):
     # Validate lead if lead_id is provided
     if opp_data.lead_id:
         lead = db.query(Lead).filter(Lead.id == opp_data.lead_id, Lead.tenant_id == current_user.tenant_id).first()
@@ -334,7 +430,7 @@ def create_opportunity(opp_data: OpportunityCreate, current_user: User = Depends
     return db_opp
 
 @app.put("/api/opportunities/{opp_id}", response_model=OpportunityResponse)
-def update_opportunity(opp_id: int, opp_data: OpportunityUpdate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def update_opportunity(opp_id: int, opp_data: OpportunityUpdate, current_user: User = Depends(require_user), db: Session = Depends(get_db)):
     db_opp = db.query(Opportunity).filter(Opportunity.id == opp_id, Opportunity.tenant_id == current_user.tenant_id).first()
     if not db_opp:
         raise HTTPException(status_code=404, detail="Opportunity not found")
@@ -349,10 +445,26 @@ def update_opportunity(opp_id: int, opp_data: OpportunityUpdate, current_user: U
         
     db.commit()
     db.refresh(db_opp)
+
+    # Auto‑create a Client when an Opportunity is marked as Closed Won
+    if db_opp.stage == "Closed Won":
+        lead = db.query(Lead).filter(Lead.id == db_opp.lead_id, Lead.tenant_id == current_user.tenant_id).first()
+        if lead and not lead.client_id:
+            new_client = Client(
+                tenant_id=current_user.tenant_id,
+                name=lead.title or lead.name_fallback or "Unnamed Client",
+                email=lead.email_fallback,
+                phone=lead.phone_fallback,
+                company=lead.company or ""
+            )
+            db.add(new_client)
+            db.flush()  # obtain new_client.id without committing whole transaction again
+            lead.client_id = new_client.id
+            db.commit()
     return db_opp
 
 @app.delete("/api/opportunities/{opp_id}")
-def delete_opportunity(opp_id: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+def delete_opportunity(opp_id: int, current_user: User = Depends(require_user), db: Session = Depends(get_db)):
     db_opp = db.query(Opportunity).filter(Opportunity.id == opp_id, Opportunity.tenant_id == current_user.tenant_id).first()
     if not db_opp:
         raise HTTPException(status_code=404, detail="Opportunity not found")
@@ -397,6 +509,7 @@ def send_chat_message(message_data: ChatMessageCreate, current_user: User = Depe
         role="assistant",
         content=query_result["response"]
     )
+    
     db.add(assistant_msg)
     db.commit()
     
@@ -453,13 +566,13 @@ def create_tenant_user(user_data: UserCreate, current_user: User = Depends(requi
     db.refresh(db_user)
     return db_user
 
+# ---------------------------------------------------------------------
+# Serve the built Vue frontend from FastAPI's root (http://<host>:8000)
+# ---------------------------------------------------------------------
+# Serve built frontend (if present)
+# Must be mounted AFTER all API routes to avoid intercepting POST/PUT/DELETE requests.
+frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_path.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
-# Serve Static Front-end
-# Verify that the static directory exists, if not, we create it dynamically.
-static_path = os.path.join(os.path.dirname(__file__), "static")
-if not os.path.exists(static_path):
-    os.makedirs(static_path)
-    os.makedirs(os.path.join(static_path, "css"))
-    os.makedirs(os.path.join(static_path, "js"))
 
-app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
